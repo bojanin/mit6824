@@ -1,11 +1,12 @@
 package raftkv
 
 import (
-	"labgob"
-	"labrpc"
 	"log"
-	"raft"
 	"sync"
+
+	"github.com/ven1xus/mit6824/labgob"
+	"github.com/ven1xus/mit6824/labrpc"
+	"github.com/ven1xus/mit6824/raft"
 )
 
 const Debug = 0
@@ -16,7 +17,6 @@ func DPrintf(format string, a ...interface{}) (n int, err error) {
 	}
 	return
 }
-
 
 type Op struct {
 	// Your definitions here.
@@ -34,7 +34,6 @@ type KVServer struct {
 
 	// Your definitions here.
 }
-
 
 func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
 	// Your code here.

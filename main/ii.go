@@ -1,8 +1,11 @@
 package main
 
-import "os"
-import "fmt"
-import "mapreduce"
+import (
+	"fmt"
+	"os"
+
+	"github.com/ven1xus/mit6824/mapreduce"
+)
 
 // The mapping function is called once for each piece of the input.
 // In this framework, the key is the name of the file that is being processed,

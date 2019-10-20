@@ -2,8 +2,9 @@ package main
 
 import (
 	"fmt"
-	"mapreduce"
 	"os"
+
+	"github.com/ven1xus/mit6824/mapreduce"
 )
 
 //
