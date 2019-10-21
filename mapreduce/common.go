@@ -32,6 +32,13 @@ type KeyValue struct {
 	Value string
 }
 
+// ByKey implements sort.Interface for []KeyValue based on the Key Field.
+type ByKey []KeyValue
+
+func (kv ByKey) Len() int           { return len(kv) }
+func (kv ByKey) Swap(i, j int)      { kv[i], kv[j] = kv[j], kv[i] }
+func (kv ByKey) Less(i, j int) bool { return kv[i].Key < kv[j].Key }
+
 // reduceName constructs the name of the intermediate file which map task
 // <mapTask> produces for reduce task <reduceTask>.
 func reduceName(jobName string, mapTask int, reduceTask int) string {
