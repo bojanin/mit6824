@@ -5,6 +5,7 @@ import (
 	"hash/fnv"
 	"io/ioutil"
 	"log"
+	"os"
 )
 
 func doMap(
@@ -23,17 +24,23 @@ func doMap(
 	for i := 0; i < nReduce; i++ {
 		fName := reduceName(jobName, mapTask, nReduce)
 		log.Printf("creating file: %s\n", fName)
-		keyVals := mapF(fName, string(content))
-		b, err := json.Marshal(keyVals)
 
+		keyVals := mapF(fName, string(content))
+
+		f, err := os.Create(fName)
+		defer f.Close()
 		if err != nil {
-			log.Panicf("Error encoding the data: %v\n", err)
+			log.Panicf("Error creating file: %v\n", err)
 		}
-		err = ioutil.WriteFile(fName, b, 0644)
-		if err != nil {
-			log.Panicf("Error writing the file: %v", err)
+
+		enc := json.NewEncoder(f)
+
+		for _, kv := range keyVals {
+			if ihash(kv.Key) == nReduce {
+				enc.Encode(kv)
+			}
 		}
-		log.Println("Success mapping content")
+
 	}
 
 	//

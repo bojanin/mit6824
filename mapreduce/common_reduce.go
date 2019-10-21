@@ -16,7 +16,7 @@ func doReduce(
 	reduceF func(key string, values []string) string,
 ) {
 
-	for i := 0; i < reduceTask; i++ {
+	for i := 0; i < nMap; i++ {
 		fName := reduceName(jobName, nMap, reduceTask)
 
 		b, err := ioutil.ReadFile(fName)
@@ -48,6 +48,7 @@ func doReduce(
 		for _, kv := range keyValues {
 			enc.Encode(KeyValue{Key: kv.Key, Value: reduceF(kv.Key, filter(keyValues, kv.Key))})
 		}
+		log.Println("Reduce phase complete")
 
 	}
 
