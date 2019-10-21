@@ -26,6 +26,9 @@ type Master struct {
 	files   []string // Input files
 	nReduce int      // Number of reduce partitions
 
+	// chan struct() doesnt send data, only a signal that something was sent
+	// struct{} with no args requires 0 memory allocation, hence why signals
+	// are sent.
 	shutdown chan struct{}
 	l        net.Listener
 	stats    []int

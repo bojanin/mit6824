@@ -6,7 +6,7 @@ import (
 )
 
 // Debugging enabled?
-const debugEnabled = false
+const debugEnabled = true
 
 // debug() will only print if debugEnabled is true
 func debug(format string, a ...interface{}) (n int, err error) {
@@ -19,9 +19,10 @@ func debug(format string, a ...interface{}) (n int, err error) {
 // jobPhase indicates whether a task is scheduled as a map or reduce task.
 type jobPhase string
 
+// TODO: Remove jobPhase
 const (
 	mapPhase    jobPhase = "mapPhase"
-	reducePhase          = "reducePhase"
+	reducePhase jobPhase = "reducePhase"
 )
 
 // KeyValue is a type used to hold the key/value pairs passed to the map and

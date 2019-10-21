@@ -1,5 +1,13 @@
 package mapreduce
 
+import (
+	"encoding/json"
+	"io/ioutil"
+	"log"
+	"os"
+	"sort"
+)
+
 func doReduce(
 	jobName string, // the name of the whole MapReduce job
 	reduceTask int, // which reduce task this is
@@ -7,6 +15,42 @@ func doReduce(
 	nMap int, // the number of map tasks that were run ("M" in the paper)
 	reduceF func(key string, values []string) string,
 ) {
+
+	for i := 0; i < reduceTask; i++ {
+		fName := reduceName(jobName, nMap, reduceTask)
+
+		b, err := ioutil.ReadFile(fName)
+
+		if err != nil {
+			log.Panicf("Error reading file: %v\n", err)
+		}
+		var keyValues []KeyValue
+		err = json.Unmarshal(b, &keyValues)
+
+		if err != nil || len(keyValues) == 0 {
+			log.Panicf("Error unmarshalling json: %v\n", err)
+		}
+		sort.Slice(keyValues, func(i, j int) bool {
+			return keyValues[i].Key < keyValues[j].Key
+		})
+
+		mergeName := mergeName(jobName, reduceTask)
+		log.Printf("creating file: %v\n", mergeName)
+
+		f, err := os.Create(mergeName)
+		defer f.Close()
+
+		if err != nil {
+			log.Panicf("Error creating file: %v\n", err)
+		}
+
+		enc := json.NewEncoder(f)
+		for _, kv := range keyValues {
+			enc.Encode(KeyValue{Key: kv.Key, Value: reduceF(kv.Key, filter(keyValues, kv.Key))})
+		}
+
+	}
+
 	//
 	// doReduce manages one reduce task: it should read the intermediate
 	// files for the task, sort the intermediate key/value pairs by key,
@@ -44,4 +88,13 @@ func doReduce(
 	//
 	// Your code here (Part I).
 	//
+}
+
+func filter(kvs []KeyValue, fKey string) (ret []string) {
+	for _, kv := range kvs {
+		if kv.Key == fKey {
+			ret = append(ret, kv.Value)
+		}
+	}
+	return
 }
