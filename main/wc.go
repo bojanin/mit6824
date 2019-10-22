@@ -2,7 +2,11 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
+	"regexp"
+	"strconv"
+	"strings"
 
 	"github.com/ven1xus/mit6824/mapreduce"
 )
@@ -15,7 +19,32 @@ import (
 // of key/value pairs.
 //
 func mapF(filename string, contents string) []mapreduce.KeyValue {
-	// Your code here (Part II).
+
+	kvs := make(map[string]int)
+	strs := strings.Split(contents, " ")
+
+	reg, err := regexp.Compile("[^a-zA-Z]")
+
+	if err != nil {
+		log.Fatalf("Error compiling regex: %v", err)
+	}
+
+	for _, str := range strs {
+		procstr := strings.ToLower(reg.ReplaceAllString(str, ""))
+		if procstr != "" {
+			kvs[procstr]++
+		}
+	}
+
+	return kvMapper(kvs)
+}
+
+func kvMapper(kv map[string]int) (kvs []mapreduce.KeyValue) {
+	for k, v := range kv {
+		mappedVal := mapreduce.KeyValue{k, strconv.Itoa(v)}
+		kvs = append(kvs, mappedVal)
+	}
+	return
 }
 
 //
@@ -24,7 +53,19 @@ func mapF(filename string, contents string) []mapreduce.KeyValue {
 // any map task.
 //
 func reduceF(key string, values []string) string {
-	// Your code here (Part II).
+	var c int
+
+	for _, val := range values {
+		i, err := strconv.Atoi(val)
+		if err != nil {
+			log.Printf("Could not convert str %v to integer: %v", val, err)
+		}
+		c += i
+	}
+	if key == "that" {
+		log.Printf("that: %v\n", c)
+	}
+	return strconv.Itoa(c)
 }
 
 // Can be run in 3 ways:
