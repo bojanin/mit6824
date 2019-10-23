@@ -53,8 +53,12 @@ func doReduce(
 
 	// write everything to file
 	enc := json.NewEncoder(outf)
+	kvs := make(map[string]struct{})
 	for _, kv := range keyValues {
-		enc.Encode(KeyValue{Key: kv.Key, Value: reduceF(kv.Key, filter(keyValues, kv.Key))})
+		if _, ok := kvs[kv.Key]; !ok {
+			enc.Encode(KeyValue{Key: kv.Key, Value: reduceF(kv.Key, filter(keyValues, kv.Key))})
+			kvs[kv.Key] = struct{}{}
+		}
 	}
 }
 
