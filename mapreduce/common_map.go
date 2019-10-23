@@ -21,8 +21,7 @@ func doMap(
 		log.Panicf("File could not be read doMap %v", err)
 	}
 
-	// Holds pointers to all input files and their encoders
-	var files []*os.File
+	// Holds pointers to all file encoders
 	var encoders []*json.Encoder
 
 	// Loop that adds files and their associated encoders to disk
@@ -36,18 +35,13 @@ func doMap(
 		}
 
 		enc := json.NewEncoder(f)
-		files = append(files, f)
 		encoders = append(encoders, enc)
 	}
-	s := string(buf)
+	keyVals := mapF(inFile, string(buf))
 
-	// Loop that applies the map function and writes to intermediate files
-	for _, file := range files {
-		keyVals := mapF(file.Name(), s)
-		for _, kv := range keyVals {
-			fileIndex := ihash(kv.Key) % nReduce
-			encoders[fileIndex].Encode(&kv)
-		}
+	for _, kv := range keyVals {
+		fileIndex := ihash(kv.Key) % nReduce
+		encoders[fileIndex].Encode(&kv)
 	}
 }
 
