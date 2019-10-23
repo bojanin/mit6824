@@ -53,22 +53,16 @@ func doReduce(
 
 	// write everything to file
 	enc := json.NewEncoder(outf)
-	kvs := make(map[string]struct{})
-	for _, kv := range keyValues {
-		if _, ok := kvs[kv.Key]; !ok {
-			enc.Encode(KeyValue{Key: kv.Key, Value: reduceF(kv.Key, filter(keyValues, kv.Key))})
-			kvs[kv.Key] = struct{}{}
-		}
+	kvs := getKvMap(keyValues)
+	for k, v := range kvs {
+		enc.Encode(KeyValue{k, reduceF(k, v)})
 	}
 }
 
-// return all values which have the same key
-// ** probably a faster way of doing this, perhaps removing on the file also **
-func filter(kvs []KeyValue, fKey string) (ret []string) {
+func getKvMap(kvs []KeyValue) map[string][]string {
+	ret := make(map[string][]string)
 	for _, kv := range kvs {
-		if kv.Key == fKey {
-			ret = append(ret, kv.Value)
-		}
+		ret[kv.Key] = append(ret[kv.Key], kv.Value)
 	}
-	return
+	return ret
 }
