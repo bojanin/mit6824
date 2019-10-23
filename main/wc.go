@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"regexp"
 	"strconv"
+	"strings"
+	"unicode"
 
 	"github.com/ven1xus/mit6824/mapreduce"
 )
@@ -21,13 +22,16 @@ func mapF(filename string, contents string) []mapreduce.KeyValue {
 
 	kvs := make(map[string]int)
 
-	reg := regexp.MustCompile("\\w+")
-	strs := reg.FindAllString(contents, -1)
+	strs := strings.FieldsFunc(contents, splitter)
 
 	for _, str := range strs {
 		kvs[str]++
 	}
 	return kvMapper(kvs)
+}
+
+func splitter(c rune) bool {
+	return !unicode.IsLetter(c) && !unicode.IsNumber(c)
 }
 
 func kvMapper(kv map[string]int) (values []mapreduce.KeyValue) {
