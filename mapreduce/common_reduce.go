@@ -42,7 +42,9 @@ func doReduce(
 	}
 
 	// Dont forget to sort keys
-	sort.Sort(ByKey(keyValues))
+	if !sort.IsSorted(ByKey(keyValues)) {
+		sort.Sort(ByKey(keyValues))
+	}
 
 	// Create outfile
 	outf, err := os.Create(outFile)
