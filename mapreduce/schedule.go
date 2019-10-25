@@ -27,23 +27,31 @@ func schedule(jobName string, mapFiles []string, nReduce int, phase jobPhase, re
 		nOther = len(mapFiles)
 	}
 	var wg sync.WaitGroup
+	wg.Add(ntasks)
 
-	fmt.Printf("Schedule: %v %v tasks (%d I/Os)\n", ntasks, phase, nOther)
-	for i := 0; i < ntasks; i++ {
+	failuresChan := make(chan int)
+	run := func(i int) {
+		w := <-registerChan
 		t := DoTaskArgs{jobName, mapFiles[i], phase, i, nOther}
-		wg.Add(1)
-		go run(registerChan, &t, &wg)
+		if call(w, "Worker.DoTask", t, nil) {
+			wg.Done()
+		} else {
+			failuresChan <- i
+		}
+		registerChan <- w
 	}
+	for i := 0; i < ntasks; i++ {
+		go run(i)
+	}
+
+	go func() {
+		for {
+			i := <-failuresChan
+			go run(i)
+		}
+	}()
+
 	wg.Wait()
 
 	fmt.Printf("Schedule: %v done\n", phase)
-}
-
-func run(ch chan string, task *DoTaskArgs, wg *sync.WaitGroup) bool {
-	for w := range ch {
-		defer func() { ch <- w }()
-		defer wg.Done()
-		return call(w, "Worker.DoTask", task, nil)
-	}
-	return false
 }

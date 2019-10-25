@@ -7,6 +7,9 @@ import (
 	"sort"
 )
 
+var sorted uint64
+var total uint64
+
 func doReduce(
 	jobName string, // the name of the whole MapReduce job
 	reduceTask int, // which reduce task this is
@@ -42,9 +45,7 @@ func doReduce(
 	}
 
 	// Dont forget to sort keys
-	if !sort.IsSorted(ByKey(keyValues)) {
-		sort.Sort(ByKey(keyValues))
-	}
+	sort.Sort(ByKey(keyValues))
 
 	// Create outfile
 	outf, err := os.Create(outFile)
