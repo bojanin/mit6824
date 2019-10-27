@@ -18,7 +18,9 @@ package raft
 //
 
 import (
+	"math/rand"
 	"sync"
+	"time"
 
 	"github.com/ven1xus/mit6824/labrpc"
 )
@@ -26,7 +28,7 @@ import (
 // import "bytes"
 // import "labgob"
 
-//
+// ApplyMsg :
 // as each Raft peer becomes aware that successive log entries are
 // committed, the peer should send an ApplyMsg to the service (or
 // tester) on the same server, via the applyCh passed to Make(). set
@@ -43,8 +45,27 @@ type ApplyMsg struct {
 	CommandIndex int
 }
 
+// Log entry, contains a command and term when entry was received by leader
+type Log struct {
+	Command interface{}
+	Term    int
+}
+
+// NULL = 'nullable' state for int values
+var NULL int = -1
+
+// Different states for the raft server
+const (
+	Leader = iota
+	Follower
+	Candidate
+)
+
+// State : Which state is the raft server on (look at the consts above)
+type State int
+
 //
-// A Go object implementing a single Raft peer.
+// Raft : A Go object implementing a single Raft peer.
 //
 type Raft struct {
 	mu        sync.Mutex          // Lock to protect shared access to this peer's state
@@ -52,20 +73,34 @@ type Raft struct {
 	persister *Persister          // Object to hold this peer's persisted state
 	me        int                 // this peer's index into peers[]
 
-	// Your data here (2A, 2B, 2C).
-	// Look at the paper's Figure 2 for a description of what
-	// state a Raft server must maintain.
+	// Persistant states on all servers
+	state       State // leader, follower or candidate
+	currentTerm int   // latest term server has seen, initialized to 0 on first boot
+	votedFor    int   // candidateID that received vote in current term (NULL if none)
+	log         []Log //Log entries (first index = 1)
+	isLeader    bool  // Value to check if the server believes its the leader
 
+	// Channels
+	voteCh       chan bool // Notifys that something was received
+	applyCh      chan ApplyMsg
+	appendLongCh chan bool
+	killCh       chan struct{}
+
+	nextIndex  []int // foreach server, index of the next log entry to send to that server
+	matchIndex []int // foreach server, index of the highest log know to be replicaed on server
+
+	// Volatile state on all servers
+	commitIndex int // index of highest log entry known to be committed
+	lastApplied int // index of highest log entry applied to state machine
 }
 
-// return currentTerm and whether this server
+// GetState : return currentTerm and whether this server
 // believes it is the leader.
 func (rf *Raft) GetState() (int, bool) {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
 
-	var term int
-	var isleader bool
-	// Your code here (2A).
-	return term, isleader
+	return rf.currentTerm, rf.isLeader
 }
 
 //
@@ -106,27 +141,52 @@ func (rf *Raft) readPersist(data []byte) {
 	// }
 }
 
+// AppendEntriesArgs are the arguments for the heartbeat and used to replicate log entries across servers
+type AppendEntriesArgs struct {
+	Term         int   // leaders term
+	leaderID     int   // so follower can redirect clients
+	prevLogIndex int   // index of log entry rimmediately precending new ones
+	prevLogTerm  int   // term of prevLogIndex
+	entries      []Log // log entries to store (empty for heartbeat)
+	leaderCommit int   // leaders commit index
+}
+
+// AppendEntriesReply is given from the RPC call
+type AppendEntriesReply struct {
+	Term    int  // current term for leader to update itself
+	success bool // true if follower contained entry matching prevLogTerm and prevLogIndex
+}
+
 //
-// example RequestVote RPC arguments structure.
+// RequestVoteArgs : example RequestVote RPC arguments structure.
 // field names must start with capital letters!
 //
 type RequestVoteArgs struct {
-	// Your data here (2A, 2B).
+	Term         int // Candidates term
+	CandidateID  int // candidate requesting vote
+	lastLogIndex int // index of candidates last log entry
+	lastLogTerm  int // term of candidates last log entry
+
 }
 
 //
-// example RequestVote RPC reply structure.
+// RequestVoteReply : example RequestVote RPC reply structure.
 // field names must start with capital letters!
 //
 type RequestVoteReply struct {
-	// Your data here (2A).
+	Term        int  // current term for candidate to update itself
+	VoteGranted bool // was the vote granted to the requesting candidate
 }
 
 //
-// example RequestVote RPC handler.
+// RequestVote : example RequestVote RPC handler.
 //
 func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	// Your code here (2A, 2B).
+}
+
+func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply) {
+
 }
 
 //
@@ -163,7 +223,12 @@ func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, reply *Reques
 	return ok
 }
 
-//
+func (rf *Raft) sendAppendEntries(server int, args *AppendEntriesArgs, reply *AppendEntriesReply) bool {
+	ok := rf.peers[server].Call("Raft.AppendEntries", args, reply)
+	return ok
+}
+
+// Start :
 // the service using Raft (e.g. a k/v server) wants to start
 // agreement on the next command to be appended to Raft's log. if this
 // server isn't the leader, returns false. otherwise start the
@@ -188,16 +253,16 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 }
 
 //
-// the tester calls Kill() when a Raft instance won't
+// Kill : the tester calls Kill() when a Raft instance won't
 // be needed again. you are not required to do anything
 // in Kill(), but it might be convenient to (for example)
 // turn off debug output from this instance.
 //
 func (rf *Raft) Kill() {
-	// Your code here, if desired.
+	rf.killCh <- struct{}{}
 }
 
-//
+// Make :
 // the service or tester wants to create a Raft server. the ports
 // of all the Raft servers (including this one) are in peers[]. this
 // server's port is peers[me]. all the servers' peers[] arrays
@@ -216,9 +281,73 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.me = me
 
 	// Your initialization code here (2A, 2B, 2C).
+	rf.state = Follower
+	rf.currentTerm = 0
+	rf.votedFor = NULL
+	rf.log = make([]Log, 1) // first index = 1 according to figure 2
+	rf.commitIndex = 0
+	rf.lastApplied = 0
 
+	rf.voteCh = make(chan bool, 1)
+	rf.applyCh = applyCh
+	rf.appendLongCh = make(chan bool, 1)
+	rf.killCh = make(chan struct{}, 1)
+
+	// Heartbeat every 300ms with 150ms of randomization
+	go rf.heartbeat(300, 150, 100)
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())
 
 	return rf
+}
+
+func (rf *Raft) follower() {
+
+}
+func (rf *Raft) candidate() {
+
+}
+func (rf *Raft) leader() {
+
+}
+
+func (rf *Raft) startEntries() {
+
+}
+
+func (rf *Raft) requestLeadership() {
+
+}
+
+func (rf *Raft) heartbeat(electCycle int, distr int, heartbeatTime int) {
+	for {
+		select {
+		case <-rf.killCh:
+			return
+		default:
+		}
+		electionTime := time.Duration(rand.Intn(distr)+electCycle) * time.Millisecond
+
+		rf.mu.Lock()
+		state := rf.state
+		rf.mu.Unlock()
+
+		// if the server is in a follower or candidate state, dont do anything
+		switch state {
+		case Follower, Candidate:
+			select {
+			case <-rf.voteCh:
+			case <-rf.appendLongCh:
+			case <-time.After(electionTime):
+				rf.mu.Lock()
+				rf.candidate()
+				rf.mu.Unlock()
+			}
+		case Leader:
+			time.Sleep(time.Duration(heartbeatTime))
+			rf.startEntries()
+		}
+
+	}
+
 }
