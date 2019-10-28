@@ -81,10 +81,10 @@ type Raft struct {
 	isLeader    bool  // Value to check if the server believes its the leader
 
 	// Channels
-	voteCh       chan bool // Notifys that something was received
-	applyCh      chan ApplyMsg
-	appendLongCh chan bool
-	killCh       chan struct{}
+	voteCh      chan bool // Notifys that something was received
+	applyCh     chan ApplyMsg
+	appendLogCh chan bool
+	killCh      chan struct{}
 
 	nextIndex  []int // foreach server, index of the next log entry to send to that server
 	matchIndex []int // foreach server, index of the highest log know to be replicaed on server
@@ -290,7 +290,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 
 	rf.voteCh = make(chan bool, 1)
 	rf.applyCh = applyCh
-	rf.appendLongCh = make(chan bool, 1)
+	rf.appendLogCh = make(chan bool, 1)
 	rf.killCh = make(chan struct{}, 1)
 
 	// Heartbeat every 300ms with 150ms of randomization
@@ -305,6 +305,8 @@ func (rf *Raft) follower() {
 
 }
 func (rf *Raft) candidate() {
+	majority := (len(rf.peers) / 2) + 1
+	currVotes := 1
 
 }
 func (rf *Raft) leader() {
@@ -337,7 +339,7 @@ func (rf *Raft) heartbeat(electCycle int, distr int, heartbeatTime int) {
 		case Follower, Candidate:
 			select {
 			case <-rf.voteCh:
-			case <-rf.appendLongCh:
+			case <-rf.appendLogCh:
 			case <-time.After(electionTime):
 				rf.mu.Lock()
 				rf.candidate()
