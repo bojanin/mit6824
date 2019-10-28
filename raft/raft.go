@@ -153,8 +153,10 @@ type AppendEntriesArgs struct {
 
 // AppendEntriesReply is given from the RPC call
 type AppendEntriesReply struct {
-	Term    int  // current term for leader to update itself
-	success bool // true if follower contained entry matching prevLogTerm and prevLogIndex
+	Term                 int  // current term for leader to update itself
+	Success              bool // true if follower contained entry matching prevLogTerm and prevLogIndex
+	ConflictingTerm      int  // Term of the conflicting Entry
+	ConflictingTermIndex int  // first index in the followers log that holds the conflicting term
 }
 
 //
@@ -185,6 +187,7 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	// Your code here (2A, 2B).
 }
 
+// AppendEntries : Invoked by leader to replicate log entries, also used as a heartbeat
 func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply) {
 
 }
